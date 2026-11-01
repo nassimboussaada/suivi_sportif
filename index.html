@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Athlète – Entraînement & Tests</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/htm@3.1.1/dist/htm.umd.js"></script>
+<style>
+:root{color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:#0a0d12;color:#e5e7eb;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:#0a0d12;z-index:30}
+input{color-scheme:dark}
+</style>
+</head>
+<script type="module">
+  // 1. Importation des outils Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+  // 2. Configuration (Copie-colle TON bloc depuis Firebase ici)
+  const firebaseConfig = {
+    apiKey: "CLE_API...",
+    authDomain: "projet-123.firebaseapp.com",
+    projectId: "projet-123",
+    storageBucket: "projet-123.appspot.com",
+    messagingSenderId: "123456",
+    appId: "1:123456:web:abc"
+  };
+
+  // 3. Initialisation de la connexion
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  // 4. Fonction pour SAUVEGARDER une nouvelle performance
+  window.ajouterPerformance = async function(exercice, repetitions) {
+    try {
+      await addDoc(collection(db, "performances"), {
+        exercice: exercice,
+        repetitions: repetitions,
+        date: new Date()
+      });
+      console.log("Performance sauvegardée sur le cloud !");
+    } catch (e) {
+      console.error("Erreur de sauvegarde: ", e);
+    }
+  };
+
+  // 5. Fonction pour AFFICHER les performances
+  window.chargerPerformances = async function() {
+    const querySnapshot = await getDocs(collection(db, "performances"));
+    querySnapshot.forEach((doc) => {
+      console.log(doc.data().exercice, doc.data().repetitions);
+    });
+  };
+</script>
+<body>
+<div id="root"></div>
+<script>
+const {useState,useEffect,useRef}=React;
+const html=htm.bind(React.createElement);
+
+/* ---------- Stockage ---------- */
+const load=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}};
+const save=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+
+/* ---------- Dates ---------- */
+const pad=n=>String(n).padStart(2,'0');
+const key=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+const parse=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d)};
+const addDays=(k,n)=>{const d=parse(k);d.setDate(d.getDate()+n);return key(d)};
+const fr=(k,o)=>parse(k).toLocaleDateString('fr-FR',o);
+
+/* ---------- Icônes (tracés Lucide) ---------- */
+const P={
+ check:'M20 6 9 17l-5-5',flame:'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.07-2.14-.22-4.05 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.15.43-2.29 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+ dumb:'M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11',chart:'M3 3v18h18M7 14l4-4 4 4 5-6',
+ cal:'M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z',
+ trophy:'M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M4 22h16M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22M18 2H6v7a6 6 0 0 0 12 0V2z',
+ trash:'M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6',l:'m15 18-6-6 6-6',r:'m9 18 6-6-6-6',plus:'M12 5v14M5 12h14',zap:'M13 2 3 14h9l-1 8 10-12h-9l1-8z',play:'M6 3l14 9-14 9z',stop:'M6 6h12v12H6z'
+};
+const Ic=({d,s=18,c=''})=>html`<svg width=${s} height=${s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className=${c}><path d=${d}/></svg>`;
+
+/* ---------- Données : exercices ---------- */
+const EX=[
+ {id:'squat',n:'Squats explosifs sur pointes de pieds',s:4,d:'15 reps'},
+ {id:'fentes',n:'Fentes bulgares',s:3,d:'10 reps / jambe'},
+ {id:'pont',n:'Pont fessier à une jambe',s:3,d:'12 reps / jambe'},
+ {id:'pompes',n:'Pompes avec tempo',s:4,d:'max de reps'},
+ {id:'dips',n:'Dips sur chaise',s:3,d:'15 reps'},
+ {id:'superman',n:'Superman',s:3,d:'15 reps'},
+ {id:'gainage',n:'Gainage dynamique coudes/mains',s:3,d:'10 allers-retours'},
+ {id:'russian',n:'Russian Twists',s:3,d:'20 reps'},
+ {id:'etir',n:'Étirements',s:1,d:'5 minutes'}
+];
+const TOTAL=EX.reduce((a,e)=>a+e.s,0);
+const nDone=(w,k)=>EX.reduce((a,e)=>a+((w[k]||{})[e.id]||[]).filter(Boolean).length,0);
+
+/* ---------- Données : tests (lower = plus bas est meilleur) ---------- */
+const TESTS=[
+ {id:'s10',cat:'Vitesse',n:'Sprint 10 m',lower:1,u:'s',dec:2,avg:[1.8,2.0],top:[1.65,1.65],avgT:'1,80 – 2,00 s',topT:'< 1,65 s',use:'Démarrage sur la balle'},
+ {id:'s30',cat:'Vitesse',n:'Sprint 30 m',lower:1,u:'s',dec:2,avg:[4.4,4.7],top:[3.8,4.0],avgT:'4,40 – 4,70 s',topT:'3,80 – 4,00 s',use:'Contre-attaque, amortie'},
+ {id:'ill',cat:'Agilité',n:'Test Illinois (10×5 m)',lower:1,u:'s',dec:1,avg:[16.5,18],top:[15.2,15.2],avgT:'16,5 – 18,0 s',topT:'< 15,2 s',use:'Changements de direction'},
+ {id:'tt',cat:'Agilité',n:'T-Test',lower:1,u:'s',dec:1,avg:[10.5,11.5],top:[9,9],avgT:'10,5 – 11,5 s',topT:'< 9,0 s',use:'Pas chassés, replacement'},
+ {id:'cmj',cat:'Explosivité',n:'Détente verticale (CMJ)',u:'cm',dec:1,avg:[45,50],top:[70,85],avgT:'45 – 50 cm',topT:'70 – 85+ cm',use:'Smash, jeu de tête'},
+ {id:'slj',cat:'Explosivité',n:'Saut en longueur sans élan',u:'m',dec:2,avg:[2.1,2.3],top:[2.8,3.1],avgT:'2,10 – 2,30 m',topT:'2,80 – 3,10 m',use:'Poussée des cuisses'},
+ {id:'sq',cat:'Musculation',n:'Squat 1RM',u:'× PdC',dec:2,avg:[1,1.2],top:[1.8,2.2],avgT:'1 à 1,2 × poids du corps',topT:'1,8 à 2,2 × poids du corps',use:'Stabilité',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'bp',cat:'Musculation',n:'Développé couché 1RM',u:'× PdC',dec:2,avg:[0.8,1],top:[1.3,1.5],avgT:'0,8 à 1 × poids du corps',topT:'1,3 à 1,5 × poids du corps',use:'Duels',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'dl',cat:'Musculation',n:'Soulevé de terre 1RM',u:'× PdC',dec:2,avg:[1.25,1.5],top:[2.25,2.75],avgT:'1,25 à 1,5 × poids du corps',topT:'2,25 à 2,75 × poids du corps',use:'Chaîne postérieure, force globale',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'ohp',cat:'Musculation',n:'Développé militaire 1RM',u:'× PdC',dec:2,avg:[0.5,0.65],top:[0.9,1.1],avgT:'0,5 à 0,65 × poids du corps',topT:'0,9 à 1,1 × poids du corps',use:'Épaules, gainage debout',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'fsq',cat:'Musculation',n:'Squat avant 1RM',u:'× PdC',dec:2,avg:[0.8,1],top:[1.5,1.75],avgT:'0,8 à 1 × poids du corps',topT:'1,5 à 1,75 × poids du corps',use:'Quadriceps, gainage',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'row',cat:'Musculation',n:'Rowing barre 1RM',u:'× PdC',dec:2,avg:[0.75,0.9],top:[1.3,1.5],avgT:'0,75 à 0,9 × poids du corps',topT:'1,3 à 1,5 × poids du corps',use:'Dos, posture',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'lat',cat:'Musculation',n:'Tirage poitrine 1RM',u:'× PdC',dec:2,avg:[0.8,1],top:[1.4,1.6],avgT:'0,8 à 1 × poids du corps',topT:'1,4 à 1,6 × poids du corps',use:'Grand dorsal, tirage',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'ht',cat:'Musculation',n:'Hip thrust 1RM',u:'× PdC',dec:2,avg:[1.25,1.5],top:[2.5,3],avgT:'1,25 à 1,5 × poids du corps',topT:'2,5 à 3 × poids du corps',use:'Fessiers, poussée de hanche',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'lp',cat:'Musculation',n:'Presse à cuisses 1RM',u:'× PdC',dec:2,avg:[2,2.5],top:[4,5],avgT:'2 à 2,5 × poids du corps',topT:'4 à 5 × poids du corps',use:'Puissance des jambes',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'cu',cat:'Musculation',n:'Curl barre 1RM',u:'× PdC',dec:2,avg:[0.4,0.5],top:[0.8,0.9],avgT:'0,4 à 0,5 × poids du corps',topT:'0,8 à 0,9 × poids du corps',use:'Biceps, tirage',hint:'Saisis le ratio : charge max ÷ poids du corps'},
+ {id:'pu',cat:'Musculation',n:'Tractions (max reps)',u:'reps',dec:0,avg:[5,8],top:[20,25],avgT:'5 à 8 reps',topT:'20 à 25+ reps',use:'Force de tirage au poids du corps',hint:'Prise pronation, menton au-dessus de la barre, sans élan'},
+ {id:'pk',cat:'Musculation',n:'Pompes (max reps)',u:'reps',dec:0,avg:[20,30],top:[50,60],avgT:'20 à 30 reps',topT:'50 à 60+ reps',use:'Endurance de force du haut du corps',hint:'Poitrine au sol, corps gainé, sans pause'},
+ {id:'dp',cat:'Musculation',n:'Dips (max reps)',u:'reps',dec:0,avg:[10,15],top:[30,40],avgT:'10 à 15 reps',topT:'30 à 40+ reps',use:'Triceps, pectoraux, épaules',hint:'Descente jusqu’à 90° au coude'},
+ {id:'pl',cat:'Musculation',n:'Gainage planche (tenue)',time:1,u:'',dec:0,avg:[60,90],top:[180,240],avgT:'1 min – 1 min 30',topT:'3 min – 4 min+',use:'Gainage, transmission de force',hint:'Format m:ss (ex. 2:15)'},
+ {id:'ll',cat:'Endurance',n:'Luc Léger',u:'palier',dec:1,avg:[8,10],top:[13,15],avgT:'Palier 8 à 10',topT:'Palier 13 à 15',use:'Répétition des efforts'},
+ {id:'vam',cat:'Endurance',n:'VAMEVAL',u:'km/h',dec:1,avg:[13,15],top:[19,21],avgT:'13 à 15 km/h',topT:'19 à 21+ km/h',use:'Récupération'},
+ {id:'k1',cat:'Endurance',n:'1000 m',lower:1,time:1,u:'',dec:0,avg:[225,255],top:[165,180],avgT:'3 min 45 – 4 min 15',topT:'2 min 45 – 3 min 00',use:'Fond aérobie',hint:'Format m:ss (ex. 3:52)'}
+];
+
+/* ---------- Logique de comparaison ---------- */
+const clamp=x=>Math.max(0,Math.min(1,x));
+const mmss=s=>{s=Math.round(s);return Math.floor(s/60)+':'+pad(s%60)};
+const fmt=(T,v)=>T.time?mmss(v):v.toFixed(T.dec)+(T.u?' '+T.u:'');
+const thr=T=>T.lower?T.top[1]:T.top[0];            // seuil « Top 1 % »
+const L={
+ pro:{l:'Niveau Pro',c:'text-emerald-300 bg-emerald-500/15 border-emerald-500/30'},
+ up:{l:'Au-dessus de la moyenne',c:'text-sky-300 bg-sky-500/15 border-sky-500/30'},
+ avg:{l:'Dans la moyenne',c:'text-amber-300 bg-amber-500/15 border-amber-500/30'},
+ low:{l:'Sous la moyenne',c:'text-rose-300 bg-rose-500/15 border-rose-500/30'}
+};
+const level=(T,v)=>{const [a,b]=T.avg,h=thr(T);
+ if(T.lower){if(v<=h)return L.pro;if(v<a)return L.up;if(v<=b)return L.avg;return L.low}
+ if(v>=h)return L.pro;if(v>b)return L.up;if(v>=a)return L.avg;return L.low};
+const scale=T=>{const [a,b]=T.avg,[l,h]=T.top;
+ if(T.lower){const w=b+(b-l)*.5,bs=l*.95;return x=>clamp((w-x)/(w-bs))}
+ const w=Math.max(0,a-(l-a)*.3),bs=h*1.05;return x=>clamp((x-w)/(bs-w))};
+const better=(T,a,b)=>T.lower?a<b:a>b;
+const parseVal=(T,s)=>{s=s.trim().replace(',','.');
+ if(T.time&&s.includes(':')){const [m,x]=s.split(':');return Number(m)*60+Number(x)}
+ return Number(s)};
+
+/* ---------- Composants ---------- */
+const Card=({c='',children})=>html`<div className=${'rounded-2xl border border-white/10 bg-white/[0.03] '+c}>${children}</div>`;
+
+function Gauge({T,v}){
+ const p=scale(T),[a,b]=T.avg,h=thr(T);
+ const aL=Math.min(p(a),p(b))*100,aW=Math.abs(p(a)-p(b))*100,pL=p(h)*100,m=p(v)*100;
+ return html`<div>
+  <div className="relative h-4 rounded-full bg-slate-800 mt-6 mb-2">
+   <div className="absolute inset-y-0 bg-amber-500/50" style=${{left:aL+'%',width:aW+'%'}}></div>
+   <div className="absolute inset-y-0 rounded-r-full bg-emerald-500/60" style=${{left:pL+'%',right:0}}></div>
+   <div className="absolute -top-1.5 -bottom-1.5 w-1 rounded bg-white shadow-[0_0_10px_rgba(255,255,255,.8)]" style=${{left:`calc(${m}% - 2px)`}}>
+    <span className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-[11px] font-bold">${fmt(T,v)}</span>
+   </div>
+  </div>
+  <div className="flex justify-between text-[11px] text-slate-500"><span>← moins bon</span><span>meilleur →</span></div>
+  <div className="grid grid-cols-3 gap-2 mt-3 text-center text-xs">
+   <div className="rounded-xl bg-white/5 p-2"><div className="text-slate-400">Ton dernier</div><div className="font-bold text-sm">${fmt(T,v)}</div></div>
+   <div className="rounded-xl bg-amber-500/10 p-2"><div className="text-amber-300">Moyenne (Amateur)</div><div className="font-semibold">${T.avgT}</div></div>
+   <div className="rounded-xl bg-emerald-500/10 p-2"><div className="text-emerald-300">Top 1 % (Pro)</div><div className="font-semibold">${T.topT}</div></div>
+  </div></div>`;
+}
+
+function Chart({T,hist}){
+ if(!hist.length)return html`<div className="h-40 grid place-items-center text-sm text-slate-500">Ajoute un premier score pour voir la courbe.</div>`;
+ const W=640,H=250,pl=54,pr=16,pt=14,pb=30,iw=W-pl-pr,ih=H-pt-pb;
+ const vals=hist.map(e=>e.v).concat(T.avg,T.top);
+ let mn=Math.min(...vals),mx=Math.max(...vals);const m=(mx-mn)*.08||1;mn-=m;mx+=m;
+ const y=v=>{const n=(v-mn)/(mx-mn);return pt+ih*(T.lower?n:1-n)};
+ const x=i=>pl+(hist.length<2?iw/2:i*iw/(hist.length-1));
+ const ticks=[0,1,2,3].map(i=>mn+(mx-mn)*i/3),th=thr(T),n=hist.length,step=Math.ceil(n/5);
+ const tl=v=>T.time?mmss(v):v.toFixed(T.dec===0?0:T.dec>1?2:1);
+ return html`<svg viewBox=${'0 0 '+W+' '+H} className="w-full h-auto">
+  <rect x=${pl} y=${pt} width=${iw} height=${Math.max(0,y(th)-pt)} fill="#10b981" opacity=".09"/>
+  <rect x=${pl} y=${Math.min(y(T.avg[0]),y(T.avg[1]))} width=${iw} height=${Math.abs(y(T.avg[0])-y(T.avg[1]))} fill="#f59e0b" opacity=".15"/>
+  ${ticks.map(v=>html`<g key=${v}><line x1=${pl} x2=${pl+iw} y1=${y(v)} y2=${y(v)} stroke="#1e293b"/><text x=${pl-8} y=${y(v)+4} textAnchor="end" fill="#94a3b8" fontSize="11">${tl(v)}</text></g>`)}
+  <line x1=${pl} x2=${pl+iw} y1=${y(th)} y2=${y(th)} stroke="#34d399" strokeDasharray="5 4"/>
+  <text x=${pl+iw-4} y=${y(th)-5} textAnchor="end" fill="#34d399" fontSize="11">Top 1 %</text>
+  <text x=${pl+6} y=${Math.min(y(T.avg[0]),y(T.avg[1]))+14} fill="#fbbf24" fontSize="11">Moyenne</text>
+  <polyline points=${hist.map((e,i)=>x(i)+','+y(e.v)).join(' ')} fill="none" stroke="#38bdf8" strokeWidth="2.5" strokeLinejoin="round"/>
+  ${hist.map((e,i)=>html`<g key=${e.date}><circle cx=${x(i)} cy=${y(e.v)} r="4.5" fill="#0a0d12" stroke="#38bdf8" strokeWidth="2.5"/>
+   ${(i%step===0||i===n-1)&&html`<text x=${x(i)} y=${H-10} textAnchor="middle" fill="#94a3b8" fontSize="11">${fr(e.date,{day:'2-digit',month:'2-digit'})}</text>`}</g>`)}
+ </svg>`;
+}
+
+function Detail({T,list,setList}){
+ const [val,setVal]=useState('');
+ const [d,setD]=useState(key(new Date()));
+ const [err,setErr]=useState('');
+ const hist=list.slice().sort((a,b)=>a.date<b.date?-1:1);
+ const last=hist[hist.length-1];
+ const add=()=>{const v=parseVal(T,val);
+  if(!isFinite(v)||v<=0||!val.trim()){setErr('Valeur invalide');return}
+  setErr('');setList([...list.filter(e=>e.date!==d),{date:d,v}]);setVal('')};
+ return html`<div className="space-y-4">
+  <${Card} c="p-4">
+   <div className="flex flex-wrap items-start justify-between gap-2">
+    <div><div className="text-xs uppercase tracking-widest text-slate-400">${T.cat}</div><h2 className="text-xl font-bold">${T.n}</h2><div className="text-sm text-slate-400">Utilité : ${T.use}</div></div>
+    ${last&&html`<span className=${'text-xs font-semibold px-2.5 py-1 rounded-full border '+level(T,last.v).c}>${level(T,last.v).l}</span>`}
+   </div>
+   <div className="text-xs text-slate-500 mt-1">${T.lower?'Plus bas = meilleur':'Plus haut = meilleur'}</div>
+  <//>
+  <${Card} c="p-4">
+   <div className="font-semibold mb-2">Nouveau score</div>
+   <div className="flex flex-wrap gap-2">
+    <input type="date" value=${d} max=${key(new Date())} onChange=${e=>setD(e.target.value)} className="rounded-xl bg-slate-900 border border-white/10 px-3 py-2 text-sm"/>
+    <input value=${val} onChange=${e=>setVal(e.target.value)} onKeyDown=${e=>e.key==='Enter'&&add()} inputMode="decimal" placeholder=${T.time?'3:52':'Valeur ('+T.u+')'} className="flex-1 min-w-[120px] rounded-xl bg-slate-900 border border-white/10 px-3 py-2 text-sm"/>
+    <button onClick=${add} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 font-semibold px-4 py-2 text-sm"><${Ic} d=${P.plus} s=${16}/>Ajouter</button>
+   </div>
+   ${(err||T.hint)&&html`<div className=${'text-xs mt-2 '+(err?'text-rose-400':'text-slate-500')}>${err||T.hint}</div>`}
+  <//>
+  ${last&&html`<${Card} c="p-4"><div className="font-semibold">Comparaison</div><${Gauge} T=${T} v=${last.v}/><//>`}
+  <${Card} c="p-4"><div className="font-semibold mb-2">Courbe de progression <span className="text-xs text-slate-500 font-normal">(↑ = meilleur)</span></div><${Chart} T=${T} hist=${hist}/><//>
+  <${Card} c="p-4"><div className="font-semibold mb-2">Historique</div>
+   ${!hist.length?html`<div className="text-sm text-slate-500">Aucun score enregistré.</div>`:html`<div className="divide-y divide-white/5">
+    ${hist.slice().reverse().map((e,i,arr)=>{const prev=arr[i+1];const df=prev?e.v-prev.v:0;const ok=prev&&df!==0&&!(T.lower?df>0:df<0);
+     return html`<div key=${e.date} className="flex items-center justify-between py-2 text-sm">
+      <span className="text-slate-400 w-28">${fr(e.date,{day:'numeric',month:'short',year:'numeric'})}</span>
+      <span className="font-semibold flex-1">${fmt(T,e.v)}</span>
+      ${prev&&df!==0&&html`<span className=${'text-xs mr-3 '+(ok?'text-emerald-400':'text-rose-400')}>${df>0?'+':'−'}${T.time?mmss(Math.abs(df)):Math.abs(df).toFixed(T.dec===0?0:T.dec>1?2:1)}</span>`}
+      <button onClick=${()=>setList(list.filter(x=>x.date!==e.date))} className="text-slate-500 hover:text-rose-400 p-1" title="Supprimer"><${Ic} d=${P.trash} s=${16}/></button></div>`})}
+   </div>`}
+  <//></div>`;
+}
+
+function Tests({t,setT}){
+ const [sel,setSel]=useState(TESTS[0].id);
+ const [cat,setCat]=useState('Tous');
+ const T=TESTS.find(x=>x.id===sel);
+ return html`<div className="space-y-4">
+  <div className="flex flex-wrap gap-1.5">${['Tous',...new Set(TESTS.map(x=>x.cat))].map(c=>html`<button key=${c} onClick=${()=>setCat(c)} className=${'text-xs font-semibold rounded-full px-3 py-1.5 border '+(c===cat?'bg-emerald-500 border-emerald-400 text-slate-900':'border-white/10 text-slate-300 bg-white/[0.03]')}>${c}</button>`)}</div>
+  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+   ${TESTS.filter(x=>cat==='Tous'||x.cat===cat).map(x=>{const h=(t[x.id]||[]).slice().sort((a,b)=>a.date<b.date?-1:1),l=h[h.length-1];
+    return html`<button key=${x.id} onClick=${()=>setSel(x.id)} className=${'text-left rounded-xl border p-2.5 transition '+(x.id===sel?'border-emerald-400/60 bg-emerald-500/10':'border-white/10 bg-white/[0.03] hover:bg-white/[0.06]')}>
+     <div className="text-[10px] uppercase tracking-wider text-slate-500">${x.cat}</div>
+     <div className="text-sm font-semibold leading-tight">${x.n}</div>
+     <div className="text-xs mt-1 flex items-center gap-1.5">${l?html`<span className="font-bold">${fmt(x,l.v)}</span><span className=${'w-2 h-2 rounded-full '+({pro:'bg-emerald-400',up:'bg-sky-400',avg:'bg-amber-400',low:'bg-rose-400'})[Object.keys(L).find(k=>L[k]===level(x,l.v))]}></span>`:html`<span className="text-slate-600">—</span>`}</div></button>`})}
+  </div>
+  <${Detail} key=${sel} T=${T} list=${t[sel]||[]} setList=${l=>setT(p=>({...p,[sel]:l}))}/>
+ </div>`;
+}
+
+const STR=[
+ {n:'Quadriceps debout',t:25,x:2,tip:'Pied derrière toi, genoux serrés, bassin droit. Par jambe.'},
+ {n:'Fente basse (fléchisseurs de hanche)',t:25,x:2,tip:'Genou au sol, pousse doucement le bassin vers l’avant. Par côté.'},
+ {n:'Ischio-jambiers',t:25,x:2,tip:'Jambe tendue devant, talon au sol, buste penché dos plat. Par jambe.'},
+ {n:'Fessiers (figure 4)',t:25,x:2,tip:'Sur le dos, cheville sur le genou opposé, ramène la cuisse vers toi. Par côté.'},
+ {n:'Pectoraux',t:20,x:2,tip:'Avant-bras contre un mur, tourne le buste à l’opposé. Par bras.'},
+ {n:'Triceps et épaule',t:15,x:2,tip:'Coude plié derrière la tête, l’autre main pousse sur le coude. Par bras.'},
+ {n:'Posture de l’enfant',t:30,x:1,tip:'Assis sur les talons, bras tendus devant, front au sol. Dos et grand dorsal.'}
+];
+
+function Stretch({idx,day,togStr}){
+ const a=day.stretch||Array(STR.length).fill(!!(day.etir&&day.etir[0]));
+ const ok=a.every(Boolean),n=a.filter(Boolean).length,first=a.findIndex(v=>!v);
+ const [run,setRun]=useState(null);
+ useEffect(()=>{if(!run)return;
+  const id=setTimeout(()=>{
+   if(run.left>1){setRun({...run,left:run.left-1});return}
+   togStr(run.i,true);
+   try{navigator.vibrate&&navigator.vibrate(250)}catch(e){}
+   const nx=run.auto?STR.findIndex((s,j)=>j>run.i&&!a[j]):-1;
+   setRun(nx>=0?{i:nx,left:STR[nx].t*STR[nx].x,auto:true}:null);
+  },1000);
+  return()=>clearTimeout(id)},[run]);
+ const start=(i,auto)=>setRun({i,left:STR[i].t*STR[i].x,auto});
+ return html`<${Card} c=${'p-4 '+(ok?'border-emerald-500/40':'')}>
+  <div className="flex items-start gap-3">
+   <div className=${'w-8 h-8 shrink-0 rounded-lg grid place-items-center text-sm font-bold '+(ok?'bg-emerald-500 text-slate-900':'bg-white/10 text-slate-300')}>${ok?html`<${Ic} d=${P.check} s=${16}/>`:idx+1}</div>
+   <div className="flex-1 min-w-0">
+    <div className="flex items-center justify-between gap-2">
+     <div><div className="font-semibold leading-tight">Étirements</div><div className="text-xs text-slate-400">${n}/${STR.length} · environ 5 minutes</div></div>
+     ${run?html`<button onClick=${()=>setRun(null)} className="inline-flex items-center gap-1.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 px-3 py-1.5 text-xs font-semibold"><${Ic} d=${P.stop} s=${14}/>Arrêter</button>`:first>=0&&html`<button onClick=${()=>start(first,true)} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-900 px-3 py-1.5 text-xs font-bold"><${Ic} d=${P.play} s=${14}/>Lancer la routine</button>`}
+    </div>
+    <div className="mt-3 space-y-2">${STR.map((s,i)=>{const on=run&&run.i===i;
+     return html`<div key=${i} className=${'rounded-xl border p-2.5 flex items-center gap-3 '+(on?'border-emerald-400/60 bg-emerald-500/10':'border-white/10')}>
+      <button onClick=${()=>{if(on)setRun(null);togStr(i)}} className=${'w-9 h-9 shrink-0 rounded-lg border grid place-items-center font-bold '+(a[i]?'bg-emerald-500 border-emerald-400 text-slate-900':'border-white/15 text-slate-400')}>${a[i]?html`<${Ic} d=${P.check} s=${18}/>`:i+1}</button>
+      <div className="flex-1 min-w-0"><div className="text-sm font-semibold leading-tight">${s.n}</div>
+       <div className="text-xs text-slate-400">${s.x>1?s.x+' × '+s.t+' s':s.t+' s'} · ${s.tip}</div>
+       ${on&&html`<div className="mt-1 text-emerald-300 font-bold text-lg tabular-nums">${mmss(run.left)}${s.x>1?html`<span className="text-xs font-medium text-slate-400 ml-2">${run.left>s.t?'1er côté':'2e côté : change !'}</span>`:''}</div>`}</div>
+      ${!on&&html`<button onClick=${()=>start(i,false)} className="p-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300" title="Lancer le minuteur"><${Ic} d=${P.play} s=${16}/></button>`}
+     </div>`})}</div>
+   </div></div><//>`;
+}
+
+function Train({w,date,setDate,today,setW}){
+ const day=w[date]||{},done=nDone(w,date),pct=Math.round(done/TOTAL*100);
+ const toggle=(e,i)=>setW(p=>{const dd={...(p[date]||{})},a=[...(dd[e.id]||Array(e.s).fill(false))];a[i]=!a[i];dd[e.id]=a;return{...p,[date]:dd}});
+ const setAll=v=>setW(p=>{const dd={};EX.forEach(e=>dd[e.id]=Array(e.s).fill(v));dd.stretch=Array(STR.length).fill(v);return{...p,[date]:dd}});
+ const togStr=(i,force)=>setW(p=>{const dd={...(p[date]||{})},a=[...(dd.stretch||Array(STR.length).fill(!!(dd.etir&&dd.etir[0])))];a[i]=force===undefined?!a[i]:force;dd.stretch=a;dd.etir=[a.every(Boolean)];return{...p,[date]:dd}});
+ return html`<div className="space-y-4">
+  <div className="flex items-center justify-between">
+   <button onClick=${()=>setDate(addDays(date,-1))} className="p-2 rounded-xl bg-white/5 hover:bg-white/10"><${Ic} d=${P.l}/></button>
+   <div className="text-center"><div className="text-xs uppercase tracking-widest text-slate-400">${date===today?'Aujourd’hui':'Séance du'}</div><div className="font-semibold capitalize">${fr(date,{weekday:'long',day:'numeric',month:'long'})}</div></div>
+   <button disabled=${date>=today} onClick=${()=>setDate(addDays(date,1))} className="p-2 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30"><${Ic} d=${P.r}/></button>
+  </div>
+  <${Card} c=${'p-4 '+(pct===100?'border-emerald-400/50 bg-emerald-500/10':'')}>
+   <div className="flex items-center justify-between mb-2"><div className="font-semibold">${pct===100?'Séance validée ! 🔥':'Progression de la séance'}</div><div className="text-sm text-slate-400">${done}/${TOTAL} séries · ${pct} %</div></div>
+   <div className="h-3 rounded-full bg-slate-800 overflow-hidden"><div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-lime-400 transition-all" style=${{width:pct+'%'}}></div></div>
+   <div className="flex gap-2 mt-3"><button onClick=${()=>setAll(true)} className="text-xs rounded-lg bg-white/5 hover:bg-white/10 px-3 py-1.5">Tout valider</button><button onClick=${()=>setAll(false)} className="text-xs rounded-lg bg-white/5 hover:bg-white/10 px-3 py-1.5">Réinitialiser</button></div>
+  <//>
+  ${EX.map((e,idx)=>{if(e.id==='etir')return html`<${Stretch} key=${e.id} idx=${idx} day=${day} togStr=${togStr}/>`;const a=day[e.id]||Array(e.s).fill(false),ok=a.filter(Boolean).length>=e.s;
+   return html`<${Card} key=${e.id} c=${'p-4 '+(ok?'border-emerald-500/40':'')}>
+    <div className="flex items-start gap-3">
+     <div className=${'w-8 h-8 shrink-0 rounded-lg grid place-items-center text-sm font-bold '+(ok?'bg-emerald-500 text-slate-900':'bg-white/10 text-slate-300')}>${ok?html`<${Ic} d=${P.check} s=${16}/>`:idx+1}</div>
+     <div className="flex-1 min-w-0"><div className="font-semibold leading-tight">${e.n}</div><div className="text-xs text-slate-400">${e.s>1?e.s+' séries · ':''}${e.d}</div>
+      <div className="flex flex-wrap gap-2 mt-3">${a.map((v,i)=>html`<button key=${i} onClick=${()=>toggle(e,i)} className=${'w-11 h-11 rounded-xl border grid place-items-center font-bold transition '+(v?'bg-emerald-500 border-emerald-400 text-slate-900':'border-white/15 text-slate-400 hover:border-emerald-400/60')}>${v?html`<${Ic} d=${P.check} s=${20}/>`:i+1}</button>`)}</div></div>
+    </div><//>`})}
+ </div>`;
+}
+
+function Stats({w,done,today,go}){
+ const ds=[...done].sort(),dt=parse(today),ws=addDays(today,-((dt.getDay()+6)%7));
+ const cnt={w:ds.filter(k=>k>=ws&&k<=today).length,m:ds.filter(k=>k.startsWith(today.slice(0,7))).length,y:ds.filter(k=>k.startsWith(today.slice(0,4))).length,a:ds.length};
+ let cur=0,d=done.has(today)?today:addDays(today,-1);while(done.has(d)){cur++;d=addDays(d,-1)}
+ let best=0,run=0;ds.forEach((k,i)=>{run=i&&addDays(ds[i-1],1)===k?run+1:1;best=Math.max(best,run)});
+ const [cm,setCm]=useState({y:dt.getFullYear(),m:dt.getMonth()});
+ const first=(new Date(cm.y,cm.m,1).getDay()+6)%7,nd=new Date(cm.y,cm.m+1,0).getDate();
+ const cells=[...Array(first).fill(null),...Array.from({length:nd},(_,i)=>i+1)];
+ const shift=n=>setCm(p=>{const x=new Date(p.y,p.m+n,1);return{y:x.getFullYear(),m:x.getMonth()}});
+ const box=[['Cette semaine',cnt.w],['Ce mois-ci',cnt.m],['Cette année',cnt.y],['Total',cnt.a]];
+ return html`<div className="space-y-4">
+  <div className="grid grid-cols-2 gap-3">${box.map(([l,v])=>html`<${Card} key=${l} c="p-4"><div className="text-xs uppercase tracking-wider text-slate-400">${l}</div><div className="text-3xl font-extrabold mt-1">${v}<span className="text-sm font-medium text-slate-500 ml-1">séance${v>1?'s':''}</span></div><//>`)}</div>
+  <div className="grid grid-cols-2 gap-3">
+   <${Card} c="p-4 bg-orange-500/10 border-orange-500/30"><div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-orange-300"><${Ic} d=${P.flame} s=${14}/>Série en cours</div><div className="text-3xl font-extrabold mt-1">${cur}<span className="text-sm font-medium text-slate-400 ml-1">jour${cur>1?'s':''}</span></div><//>
+   <${Card} c="p-4"><div className="flex items-center gap-1.5 text-xs uppercase tracking-wider text-slate-400"><${Ic} d=${P.trophy} s=${14}/>Meilleure série</div><div className="text-3xl font-extrabold mt-1">${best}<span className="text-sm font-medium text-slate-500 ml-1">jour${best>1?'s':''}</span></div><//>
+  </div>
+  <${Card} c="p-4">
+   <div className="flex items-center justify-between mb-3">
+    <button onClick=${()=>shift(-1)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10"><${Ic} d=${P.l} s=${16}/></button>
+    <div className="font-semibold capitalize">${new Date(cm.y,cm.m,1).toLocaleDateString('fr-FR',{month:'long',year:'numeric'})}</div>
+    <button onClick=${()=>shift(1)} className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10"><${Ic} d=${P.r} s=${16}/></button></div>
+   <div className="grid grid-cols-7 gap-1.5 text-center text-[11px] text-slate-500 mb-1.5">${['L','M','M','J','V','S','D'].map((x,i)=>html`<div key=${i}>${x}</div>`)}</div>
+   <div className="grid grid-cols-7 gap-1.5">${cells.map((n,i)=>{if(!n)return html`<div key=${i}/>`;
+    const k=cm.y+'-'+pad(cm.m+1)+'-'+pad(n),ok=done.has(k),part=!ok&&nDone(w,k)>0;
+    return html`<button key=${i} disabled=${k>today} onClick=${()=>go(k)} className=${'aspect-square rounded-lg text-xs font-semibold '+(ok?'bg-emerald-500 text-slate-900':part?'bg-emerald-500/25 text-emerald-200':'bg-white/5 text-slate-400')+(k===today?' ring-2 ring-sky-400':'')+(k>today?' opacity-30':'')}>${n}</button>`})}</div>
+   <div className="flex gap-4 text-[11px] text-slate-500 mt-3"><span><i className="inline-block w-2.5 h-2.5 rounded bg-emerald-500 mr-1"></i>Séance complète</span><span><i className="inline-block w-2.5 h-2.5 rounded bg-emerald-500/25 mr-1"></i>Partielle</span></div>
+  <//></div>`;
+}
+
+/* ---------- Synchronisation (fusion) ---------- */
+const mergeW=(a,b)=>{const o={...a};Object.keys(b).forEach(k=>{if(!o[k])o[k]=b[k];else{const d={...o[k]};Object.keys(b[k]).forEach(e=>{const x=d[e]||[],y=b[k][e]||[];d[e]=Array.from({length:Math.max(x.length,y.length)},(_,i)=>!!(x[i]||y[i]))});o[k]=d}});return o};
+const mergeT=(a,b)=>{const o={...a};Object.keys(b).forEach(id=>{const m=new Map();(o[id]||[]).forEach(e=>m.set(e.date,e));(b[id]||[]).forEach(e=>{if(!m.has(e.date))m.set(e.date,e)});o[id]=[...m.values()]});return o};
+const SY={cloud:['Synchronisé','text-emerald-300 border-emerald-500/30 bg-emerald-500/10'],saving:['Sauvegarde…','text-sky-300 border-sky-500/30 bg-sky-500/10'],error:['Synchro KO','text-rose-300 border-rose-500/30 bg-rose-500/10'],local:['Local','text-slate-400 border-white/10 bg-white/5']};
+
+function App(){
+ const today=key(new Date());
+ const [tab,setTab]=useState('train');
+ const [date,setDate]=useState(today);
+ const [w,setW]=useState(()=>load('ft_workouts',{}));
+ const [t,setT]=useState(()=>load('ft_tests',{}));
+ useEffect(()=>save('ft_workouts',w),[w]);
+ useEffect(()=>save('ft_tests',t),[t]);
+ const [sync,setSync]=useState('local'),[ready,setReady]=useState(false);
+ const R=useRef({ref:null,last:'',ts:0});
+ useEffect(()=>{let un=()=>{},dead=false;
+  (async()=>{try{
+   if(!window.claude||!window.claude.use)return;
+   const [db,user]=await Promise.all([window.claude.use('db'),window.claude.use('user')]);
+   if(!db||!user)return;
+   const uid=await user.id();if(!uid)return;
+   const r=R.current;r.ref=db.doc('data/users/'+uid+'/state');
+   const s=await r.ref.get();if(dead)return;
+   const rem=s.exists?s.data():null;
+   if(rem){r.ts=rem.ts||0;setW(p=>mergeW(p,rem.w||{}));setT(p=>mergeT(p,rem.t||{}))}
+   un=r.ref.onSnapshot(sn=>{const d=sn.exists?sn.data():null;if(!d||!(d.ts>r.ts))return;r.ts=d.ts;r.last=JSON.stringify({w:d.w||{},t:d.t||{}});setW(d.w||{});setT(d.t||{});setSync('cloud')},()=>setSync('error'));
+   setReady(true);setSync('cloud');
+  }catch(e){setSync('error')}})();
+  return()=>{dead=true;un()}},[]);
+ useEffect(()=>{const r=R.current;if(!ready)return;const s=JSON.stringify({w,t});if(s===r.last)return;
+  setSync('saving');
+  const id=setTimeout(async()=>{r.ts=Date.now();r.last=s;try{await r.ref.set({w,t,ts:r.ts});setSync('cloud')}catch(e){setSync('error')}},700);
+  return()=>clearTimeout(id)},[w,t,ready]);
+ const done=new Set(Object.keys(w).filter(k=>nDone(w,k)>=TOTAL));
+ let cur=0,d=done.has(today)?today:addDays(today,-1);while(done.has(d)){cur++;d=addDays(d,-1)}
+ const tabs=[['train','Entraînement',P.dumb],['stats','Statistiques',P.cal],['tests','Tests physiques',P.chart]];
+ return html`<div className="min-h-screen">
+  <header className="sticky z-20 border-b border-white/5 backdrop-blur bg-[#0a0d12]/90" style=${{top:'env(safe-area-inset-top,0px)'}}>
+   <div className="max-w-3xl mx-auto px-4 pt-3 flex items-center justify-between">
+    <div className="flex items-center gap-2 font-extrabold tracking-tight text-lg"><span className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-400 to-lime-300 text-slate-900 grid place-items-center"><${Ic} d=${P.zap} s=${18}/></span>FOOT<span className="text-emerald-400">/</span>TENNIS LAB</div>
+    <div className="flex items-center gap-2"><span className=${'text-[11px] font-semibold border rounded-full px-2 py-1 '+SY[sync][1]}>${SY[sync][0]}</span><div className="flex items-center gap-1 text-sm font-bold text-orange-300 bg-orange-500/10 border border-orange-500/30 rounded-full px-3 py-1"><${Ic} d=${P.flame} s=${15}/>${cur}</div></div>
+   </div>
+   <nav className="max-w-3xl mx-auto px-2 flex">${tabs.map(([id,l,ic])=>html`<button key=${id} onClick=${()=>setTab(id)} className=${'flex-1 flex items-center justify-center gap-1.5 py-3 text-sm font-semibold border-b-2 '+(tab===id?'border-emerald-400 text-emerald-300':'border-transparent text-slate-400 hover:text-slate-200')}><${Ic} d=${ic} s=${16}/><span className="hidden xs:inline sm:inline">${l}</span></button>`)}</nav>
+  </header>
+  <main className="max-w-3xl mx-auto px-4 py-5 pb-16">
+   ${tab==='train'&&html`<${Train} w=${w} date=${date} setDate=${setDate} today=${today} setW=${setW}/>`}
+   ${tab==='stats'&&html`<${Stats} w=${w} done=${done} today=${today} go=${k=>{setDate(k);setTab('train')}}/>`}
+   ${tab==='tests'&&html`<${Tests} t=${t} setT=${setT}/>`}
+   <p className="text-center text-xs text-slate-600 mt-8">${sync==='local'?'Données enregistrées uniquement dans ce navigateur (ouvre la page depuis claude.ai, connecté, pour synchroniser).':'Données synchronisées avec ton compte claude.ai (Chrome, Safari…).'}</p>
+  </main></div>`;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(html`<${App}/>`);
+</script>
+</body>
+</html>
