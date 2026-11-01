@@ -19,16 +19,16 @@ input{color-scheme:dark}
 <script type="module">
   // 1. Importation des outils Firebase
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-  import { getFirestore, collection, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
+  import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+  
   // 2. Configuration (Copie-colle TON bloc depuis Firebase ici)
   const firebaseConfig = {
-    apiKey: "CLE_API...",
-    authDomain: "projet-123.firebaseapp.com",
-    projectId: "projet-123",
-    storageBucket: "projet-123.appspot.com",
-    messagingSenderId: "123456",
-    appId: "1:123456:web:abc"
+    apiKey: "AIzaSyD_VRAIE_CLE_TRES_LONGUE...",
+    authDomain: "ton-projet-123.firebaseapp.com",
+    projectId: "ton-projet-123",
+    storageBucket: "ton-projet-123.firebasestorage.app",
+    messagingSenderId: "9876543210",
+    appId: "1:9876543210:web:abc123def456"
   };
 
   // 3. Initialisation de la connexion
